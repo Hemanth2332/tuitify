@@ -4,7 +4,7 @@ import yt_dlp
 
 
 class YoutubeSearcher:
-    def __init__(self, default_results: int = 30):
+    def __init__(self, default_results: int = 10):
         self.default_results = default_results
         self.ydl_opts = {
             "format": "bestaudio/best",
@@ -43,9 +43,7 @@ class YoutubeSearcher:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
-    def search_media_details(
-        self, query: str, num_results: int | None = None
-    ) -> list[dict]:
+    def search_media_details(self, query: str, num_results: int | None = None) -> list[dict]:
         entries = self.search(query=query, num_results=num_results)
         results: list[dict] = []
 
