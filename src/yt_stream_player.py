@@ -48,8 +48,12 @@ class YTStreamVLC:
                 while True:
                     state = self.player.get_state()
 
-                    if state in [vlc.State.Ended, vlc.State.Error]:
-                        raise Exception("Stream ended or error")
+                    if state == vlc.State.Ended:
+                        print("Playback finished.")
+                        return
+
+                    if state == vlc.State.Error:
+                        raise Exception("Playback error")
 
                     # update current playback time
                     t = self.player.get_time()
