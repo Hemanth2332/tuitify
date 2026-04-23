@@ -1,5 +1,8 @@
-def main():
-    print("Hello from tuitify!")
+from src.tui import Tuitify
+
+
+def main() -> None:
+    Tuitify().run()
 
 
 if __name__ == "__main__":

@@ -1,74 +1,117 @@
+from __future__ import annotations
+
 import time
-import yt_dlp
+from collections.abc import Callable
+from typing import Any
+
 import vlc
+
+from src.youtube_service import YouTubeService
 
 
 class YTStreamVLC:
-    def __init__(self, url: str):
-        self.url = url
+    """Small VLC wrapper that plays one YouTube track to completion."""
+
+    def __init__(
+        self,
+        service: YouTubeService | None = None,
+        poll_interval: float = 1.0,
+    ):
+        self.service = service or YouTubeService()
+        self.poll_interval = poll_interval
         self.instance = vlc.Instance("--no-video")
         self.player = self.instance.media_player_new()
-        self.current_time = 0  # milliseconds
-        self.duration = None
 
-    def get_stream_info(self):
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "format": "bestaudio/best",
-        }
+    def play_track(
+        self,
+        track: dict[str, Any],
+        retry_on_error: bool = True,
+        max_retries: int = 3,
+        prefetched_stream_url: str | None = None,
+        on_near_end: Callable[[], None] | None = None,
+        near_end_seconds: int = 12,
+    ) -> str:
+        video_url = track.get("url")
+        if not video_url:
+            raise ValueError("Track must include a 'url'.")
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(self.url, download=False)
-            return info["url"], info.get("duration")
+        attempts = 0
+        resume_position_ms = 0
+        known_duration = track.get("duration")
+        use_prefetched_stream = bool(prefetched_stream_url)
 
-    def play(self, stream_url):
+        while True:
+            try:
+                if use_prefetched_stream and prefetched_stream_url:
+                    stream_url = prefetched_stream_url
+                    use_prefetched_stream = False
+                else:
+                    stream_url, _duration = self.service.get_stream_info(video_url)
+                self._start_stream(stream_url, resume_position_ms)
+                return self._monitor_until_finished(
+                    known_duration_seconds=known_duration,
+                    on_near_end=on_near_end,
+                    near_end_seconds=near_end_seconds,
+                )
+            except Exception:
+                attempts += 1
+                if not retry_on_error or attempts > max_retries:
+                    raise
+                resume_position_ms = max(self.player.get_time(), 0)
+                time.sleep(1)
+
+    def _start_stream(self, stream_url: str, resume_position_ms: int) -> None:
         media = self.instance.media_new(stream_url)
         self.player.set_media(media)
         self.player.play()
-
-        # wait for VLC to start
         time.sleep(1)
+        if resume_position_ms > 0:
+            self.player.set_time(resume_position_ms)
 
-        if self.current_time > 0:
-            print(f"Resuming at {self.current_time/1000:.2f}s")
-            self.player.set_time(int(self.current_time))
-
-    def start(self):
+    def _monitor_until_finished(
+        self,
+        known_duration_seconds: int | None = None,
+        on_near_end: Callable[[], None] | None = None,
+        near_end_seconds: int = 12,
+    ) -> str:
+        near_end_triggered = False
         while True:
-            try:
-                print("Fetching stream URL...")
-                stream_url, duration = self.get_stream_info()
+            state = self.player.get_state()
+            if state == vlc.State.Ended:
+                return "ended"
+            if state == vlc.State.Stopped:
+                return "stopped"
+            if state == vlc.State.Error:
+                raise RuntimeError("Playback error")
 
-                if duration:
-                    self.duration = duration * 1000  # ms
+            if on_near_end and not near_end_triggered:
+                current_time = self.player.get_time()
+                duration_ms = self._resolve_duration_ms(known_duration_seconds)
+                if duration_ms and current_time >= 0:
+                    remaining_ms = duration_ms - current_time
+                    if remaining_ms <= near_end_seconds * 1000:
+                        near_end_triggered = True
+                        on_near_end()
 
-                self.play(stream_url)
+            time.sleep(self.poll_interval)
 
-                while True:
-                    state = self.player.get_state()
+    def _resolve_duration_ms(self, known_duration_seconds: int | None) -> int | None:
+        if known_duration_seconds and known_duration_seconds > 0:
+            return known_duration_seconds * 1000
 
-                    if state == vlc.State.Ended:
-                        print("Playback finished.")
-                        return
+        live_length_ms = self.player.get_length()
+        if live_length_ms and live_length_ms > 0:
+            return live_length_ms
+        return None
 
-                    if state == vlc.State.Error:
-                        raise Exception("Playback error")
+    def stop(self) -> None:
+        self.player.stop()
 
-                    # update current playback time
-                    t = self.player.get_time()
-                    if t > 0:
-                        self.current_time = t
+    def toggle_pause(self) -> None:
+        self.player.pause()
 
-                    time.sleep(1)
+    def current_time_ms(self) -> int:
+        return max(self.player.get_time(), 0)
 
-            except Exception as e:
-                print(f"Reconnecting... last position {self.current_time/1000:.2f}s")
-                time.sleep(1)
-
-
-if __name__ == "__main__":
-    url = "https://www.youtube.com/watch?v=RMbFjeVonyg"
-    player = YTStreamVLC(url)
-    player.start()
-    
+    def total_length_ms(self) -> int:
+        return max(self.player.get_length(), 0)
