@@ -26,6 +26,7 @@ class Tuitify(App):
         Binding("tab", "focus_next", "Next Panel", show=False),
         Binding("i", "focus_input", "Focus Input"),
         Binding("space", "toggle_pause", "Play/Pause"),
+        Binding("n", "next_track", "Next"),
         Binding("left", "seek_backward", "Back 10s", show=False),
         Binding("right", "seek_forward", "Forward 10s", show=False),
         Binding("up", "cursor_up", "Cursor Up"),
@@ -106,6 +107,11 @@ class Tuitify(App):
         height: 100%;
     }
 
+    #next-up {
+        color: #b0b7c3;
+        margin-top: 2;
+    }
+
     ListItem {
         height: auto;
         padding: 0 1;
@@ -135,8 +141,11 @@ class Tuitify(App):
 
         self.searcher = YoutubeSearcher(default_results=25)
         self.player = YTStreamVLC()
+        self.radio = RadioEngine()
 
         self.search_results: list[dict[str, Any]] = []
+        self.recommendation_queue: list[dict[str, Any]] = []
+        self.recommendation_urls: list[str] = []
         self.current_track: dict[str, Any] | None = None
         self.current_duration_seconds: int = 0
         self.playback_nonce = 0
@@ -173,7 +182,9 @@ class Tuitify(App):
                     yield Static("Title", id="title")
                     yield Static("Artist", id="artist")
                     yield ProgressBar(total=100, id="progress")
+                    
                     yield Static("0:00 / 0:00", id="time")
+                    yield Static("Next Up: -", id="next-up")
 
         yield Footer()
 
@@ -185,13 +196,27 @@ class Tuitify(App):
     def action_quit(self) -> None:
         self.playback_nonce += 1
         self.current_track = None
+        self.recommendation_queue.clear()
+        self.recommendation_urls = []
         self.player.stop()
+        self._update_next_up_ui()
         self.exit()
 
     def action_toggle_pause(self) -> None:
         if not self.current_track:
             return
         self.player.toggle_pause()
+
+    def action_next_track(self) -> None:
+        if not self.current_track:
+            return
+
+        next_track = self._pop_recommendation()
+        if not next_track:
+            self.notify("No next recommendation ready.", severity="warning")
+            return
+
+        self.start_playback(next_track)
 
     def action_seek_backward(self) -> None:
         self._seek_relative_ms(-10_000)
@@ -313,20 +338,39 @@ class Tuitify(App):
         self.playback_nonce += 1
         nonce = self.playback_nonce
         self.player.stop()
-        self._set_current_track(track)
         self._playback_session(nonce, track)
 
     @work(exclusive=True, thread=True, group="playback")
     def _playback_session(self, nonce: int, track: dict[str, Any]) -> None:
-        if nonce != self.playback_nonce:
-            return
+        current_track = track
 
-        try:
-            self.player.play_track(track, retry_on_error=True)
-        except Exception as error:
-            self.call_from_thread(
-                self.notify, f"Playback failed: {error}", severity="error"
-            )
+        while nonce == self.playback_nonce:
+            self.call_from_thread(self._set_current_track, current_track)
+            self._seed_recommendations(current_track, limit=10)
+
+            try:
+                end_state = self.player.play_track(current_track, retry_on_error=True)
+            except Exception as error:
+                self.call_from_thread(
+                    self.notify, f"Playback failed: {error}", severity="error"
+                )
+                return
+
+            if nonce != self.playback_nonce:
+                return
+
+            if end_state != "ended":
+                return
+
+            self.radio.mark_played(current_track)
+            next_track = self._pop_recommendation()
+            if not next_track:
+                next_track = self.radio.next_track(seed=current_track)
+
+            if not next_track:
+                return
+
+            current_track = next_track
 
     def _set_current_track(self, track: dict[str, Any]) -> None:
         self.current_track = track
@@ -346,6 +390,7 @@ class Tuitify(App):
             self._load_artwork(str(thumbnail_url))
         else:
             self._set_artwork(None)
+        self._update_next_up_ui()
 
     @work(exclusive=True, thread=True, group="artwork")
     def _load_artwork(self, image_url: str) -> None:
@@ -360,6 +405,59 @@ class Tuitify(App):
 
     def _set_artwork(self, image_data: io.BytesIO | None) -> None:
         self.query_one("#album-art", Image).image = image_data
+
+    def _seed_recommendations(self, seed_track: dict[str, Any], limit: int = 10) -> None:
+        candidates = self.radio.fetch_next_from_seed(seed_track)
+        seeded: list[dict[str, Any]] = []
+
+        for candidate in candidates:
+            if len(seeded) >= limit:
+                break
+
+            duration_seconds = int(candidate.get("duration") or 0)
+            if duration_seconds < 120:
+                continue
+
+            candidate_url = candidate.get("url")
+            if not candidate_url:
+                candidate_id = candidate.get("id")
+                if not candidate_id:
+                    continue
+                candidate_url = f"https://www.youtube.com/watch?v={candidate_id}"
+                candidate["url"] = candidate_url
+            candidate_id = str(candidate.get("id") or "")
+            if candidate_id and not candidate.get("thumbnail"):
+                candidate["thumbnail"] = f"https://i.ytimg.com/vi/{candidate_id}/hqdefault.jpg"
+
+            if not candidate.get("total_play_time"):
+                candidate["total_play_time"] = self._format_seconds(duration_seconds)
+            if not candidate.get("artist_name"):
+                candidate["artist_name"] = "Recommended"
+
+            seeded.append(candidate)
+
+        self.recommendation_queue = seeded
+        self.recommendation_urls = [str(track.get("url", "")) for track in seeded]
+        self.call_from_thread(self._update_next_up_ui)
+
+    def _pop_recommendation(self) -> dict[str, Any] | None:
+        if not self.recommendation_queue:
+            return None
+
+        next_track = self.recommendation_queue.pop(0)
+        self.recommendation_urls = [str(track.get("url", "")) for track in self.recommendation_queue]
+        return next_track
+
+    def _update_next_up_ui(self) -> None:
+        next_up_widget = self.query_one("#next-up", Static)
+        if not self.recommendation_queue:
+            next_up_widget.update("Next Up: -")
+            return
+
+        next_track = self.recommendation_queue[0]
+        next_title = str(next_track.get("title") or "Unknown title")
+        next_artist = str(next_track.get("artist_name") or "Recommended")
+        next_up_widget.update(f"Next Up: {next_title} | {next_artist}")
 
     def _refresh_player_progress(self) -> None:
         if not self.current_track:
@@ -408,6 +506,15 @@ class Tuitify(App):
         if hours:
             return f"{hours}:{minutes:02d}:{seconds:02d}"
         return f"{minutes}:{seconds:02d}"
+
+    @staticmethod
+    def _format_seconds(value: int) -> str:
+        total_seconds = max(int(value), 0)
+        minutes, seconds = divmod(total_seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
 
 
     
