@@ -37,7 +37,7 @@ As a contributor to ![SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’
 - **Keyboard Centric**: Optimized for efficiency with customizable keybindings.
 - **Album Art**: Real-time display of track artwork in your terminal.
 
-### Support Matrix [^1]
+### Support Matrix
 
 | Terminal            | TGP support | Sixel support | Works with textual-image |
 |---------------------|:-----------:|:-------------:|:------------------------:|
