@@ -39,8 +39,6 @@ As a contributor to ![SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’
 
 ### Support Matrix [^1]
 
-[^1]: Based on [Are We Sixel Yet?](https://www.arewesixelyet.com/)
-
 | Terminal            | TGP support | Sixel support | Works with textual-image |
 |---------------------|:-----------:|:-------------:|:------------------------:|
 | Black Box           |          ❌ |            ✅ |                       ✅ |
