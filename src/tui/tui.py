@@ -3,138 +3,26 @@ from __future__ import annotations
 import io
 from typing import Any
 
+import requests
 from textual import work
 from textual.widgets import ListItem
 from textual.app import App
-from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll, HorizontalScroll
 from textual.widgets import Footer, Header, Input, ListView, ProgressBar, Select, Static
 from textual_image.widget import Image
 from rich.text import Text
 
-import requests
-
 from src.youtube.radio import RadioEngine
 from src.search.searcher import YoutubeSearcher
 from src.youtube.player import YTStreamVLC
 
+from .keybindings import BINDINGS
 
 class Tuitify(App):
 
-    BINDINGS = [
-        Binding("q", "quit", "Quit", priority=True),
-        Binding("tab", "focus_next", "Next Panel", show=False),
-        Binding("i", "focus_input", "Focus Input", show=True),
-        Binding("space", "toggle_pause", "Play/Pause", show=True),
-        Binding("n", "next_track", "Next", show=True),
-        Binding("left", "seek_backward", "← Back 10s", show=True),
-        Binding("right", "seek_forward", "→ Forward 10s", show=True),
-        Binding("up", "cursor_up", "Cursor Up", show=True),
-        Binding("down", "cursor_down", "Cursor Down", show=True),
-    ]
+    BINDINGS = BINDINGS
 
-    CSS = """
-    Screen {
-        layout: vertical;
-    }
-
-    #main-layout {
-        height: 1fr;
-        width: 100%;
-    }
-
-    #top-panels {
-        height: 1fr;
-        width: 100%;
-    }
-
-    .panel {
-        border: round #3c3f46;
-        padding: 1;
-        width: 1fr;
-        height: 1fr;
-    }
-
-    .search-result-view{
-        margin-top: 1;
-        border: round #56B6C6;
-    }
-
-    .search-results-shell {
-        margin-top: 2;
-        height: 1fr;
-        border: round #2f3238;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-gutter: stable;
-        scrollbar-color: #56B6C6;
-    }
-
-    .search-results {
-        height: 1fr;
-        width: auto;
-        min-width: 100%;
-        border: none;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
-
-    #search-controls {
-        height: auto;
-        width: 100%;
-    }
-
-    #media-select {
-        width: 14;
-        margin-right: 1;
-    }
-
-    #search-input {
-        width: 1fr;
-    }
-
-    .art-frame {
-        border: round #3c3f46;
-        width: 100%;
-        height: 50%;
-        align: center middle;
-        background: #111418;
-        overflow: hidden;
-    }
-
-    #album-art {
-        width: auto;
-        height: 100%;
-    }
-
-    #next-up {
-        color: #b0b7c3;
-        margin-top: 2;
-    }
-
-    ListItem {
-        height: auto;
-        padding: 0 1;
-        width: auto;
-        min-width: 100%;
-    }
-
-    .result-line{
-        text-wrap: nowrap;
-        width: auto;
-        height: 1;
-        color: #d7dae0;
-    }
-
-    ListItem.--highlight {
-        background: #2b313a;
-    }
-
-    ListItem.--highlight .result-line {
-        text-style: bold;
-    }
-
-    """
+    CSS_PATH = "styles.tcss"
 
     def __init__(self) -> None:
         super().__init__()
@@ -516,8 +404,3 @@ class Tuitify(App):
             return f"{hours}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
-
-    
-
-if __name__ == "__main__":
-    Tuitify().run()
