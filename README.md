@@ -22,11 +22,11 @@ Users can search for music or podcasts, instantly stream audio using VLC-backed 
 
 ## Why Tuitify?
 
-Most terminal music players focus only on local files. Tuitify is built for streaming-first listening. Listen your favourite music/podcasts without leaving the terminal.
+Most terminal music players focus only on local files. Tuitify is built for streaming-first listening. Listen your favourite music and podcasts without leaving the terminal.
 
 The goal is simple: minimal friction, continuous listening, and a terminal-native music experience, no more ads, no more interruptions, just the freedom to enjoy your music seamlessly from your command line.
 
-As a contributor to ![SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’ve seen how a simple and seamless streaming experience can completely change the way people listen to music. Tuitify brings that same idea to the terminal-a lightweight, keyboard-first music player that keeps playback smooth, fast, and uninterrupted.
+As a contributor to [SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’ve seen how a simple and seamless streaming experience can completely change the way people listen to music. Tuitify brings that same idea to the terminal-a lightweight, keyboard-first music player that keeps playback smooth, fast, and uninterrupted.
 
 
 ## Features
