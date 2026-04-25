@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pyinstaller>=6.20.0",
     "python-vlc>=3.0.21203",
     "requests>=2.33.1",
     "textual>=8.2.4",

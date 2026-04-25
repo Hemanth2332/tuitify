@@ -6,7 +6,7 @@ from typing import Any
 
 import vlc
 
-from src.youtube_service import YouTubeService
+from .service import YouTubeService
 
 
 class YTStreamVLC:

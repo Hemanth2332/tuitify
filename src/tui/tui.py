@@ -5,7 +5,7 @@ from typing import Any
 
 from textual import work
 from textual.widgets import ListItem
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll, HorizontalScroll
 from textual.widgets import Footer, Header, Input, ListView, ProgressBar, Select, Static
@@ -14,9 +14,9 @@ from rich.text import Text
 
 import requests
 
-from src.radio import RadioEngine
-from src.searcher import YoutubeSearcher
-from src.yt_stream_player import YTStreamVLC
+from src.youtube.radio import RadioEngine
+from src.search.searcher import YoutubeSearcher
+from src.youtube.player import YTStreamVLC
 
 
 class Tuitify(App):
@@ -24,13 +24,13 @@ class Tuitify(App):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("tab", "focus_next", "Next Panel", show=False),
-        Binding("i", "focus_input", "Focus Input"),
-        Binding("space", "toggle_pause", "Play/Pause"),
-        Binding("n", "next_track", "Next"),
-        Binding("left", "seek_backward", "Back 10s", show=False),
-        Binding("right", "seek_forward", "Forward 10s", show=False),
-        Binding("up", "cursor_up", "Cursor Up"),
-        Binding("down", "cursor_down", "Cursor Down")
+        Binding("i", "focus_input", "Focus Input", show=True),
+        Binding("space", "toggle_pause", "Play/Pause", show=True),
+        Binding("n", "next_track", "Next", show=True),
+        Binding("left", "seek_backward", "← Back 10s", show=True),
+        Binding("right", "seek_forward", "→ Forward 10s", show=True),
+        Binding("up", "cursor_up", "Cursor Up", show=True),
+        Binding("down", "cursor_down", "Cursor Down", show=True),
     ]
 
     CSS = """

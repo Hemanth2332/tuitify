@@ -3,8 +3,8 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from src.utils import clean_tracks, parse_recommendations
-from src.youtube_service import YouTubeService
+from .utils import clean_tracks, parse_recommendations
+from .service import YouTubeService
 
 
 class RadioEngine:

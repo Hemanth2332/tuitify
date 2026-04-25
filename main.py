@@ -1,4 +1,4 @@
-from src.tui.tui_test import Tuitify
+from src.tui.tui import Tuitify
 
 
 def main() -> None:
