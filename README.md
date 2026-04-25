@@ -3,7 +3,7 @@
 </div>
 
 <p align="center">
-  <strong>A Terminal-based music player powered by YouTube.</strong>
+  <strong>Terminal-first streaming engine with smart autoplay radio.</strong>
 </p>
 
 ---
@@ -11,7 +11,6 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![uv](https://img.shields.io/badge/uv-0.10.22+-green.svg)](https://github.com/astral-sh/uv)
 [![license](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![VLC](https://img.shields.io/badge/VLC-0.0.1-orange.svg)](https://www.videolan.org/vlc/)
 
 ## Overview
 
@@ -21,6 +20,15 @@ Users can search for music or podcasts, instantly stream audio using VLC-backed 
 
 ![UI](images/screenshot_1.png)
 
+## Why Tuitify?
+
+Most terminal music players focus only on local files. Tuitify is built for streaming-first listening. Listen your favourite music/podcasts without leaving the terminal.
+
+The goal is simple: minimal friction, continuous listening, and a terminal-native music experience, no more ads, no more interruptions, just the freedom to enjoy your music seamlessly from your command line.
+
+As a contributor to ![SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’ve seen how a simple and seamless streaming experience can completely change the way people listen to music. Tuitify brings that same idea to the terminal-a lightweight, keyboard-first music player that keeps playback smooth, fast, and uninterrupted.
+
+
 ## Features
 
 - **Global Search**: Instantly find songs, albums, or podcasts.
@@ -28,6 +36,28 @@ Users can search for music or podcasts, instantly stream audio using VLC-backed 
 - **High-Quality Audio**: Uses `yt-dlp` and `vlc` for reliable and high-quality streaming.
 - **Keyboard Centric**: Optimized for efficiency with customizable keybindings.
 - **Album Art**: Real-time display of track artwork in your terminal.
+
+### Support Matrix [^1]
+
+[^1]: Based on [Are We Sixel Yet?](https://www.arewesixelyet.com/)
+
+| Terminal            | TGP support | Sixel support | Works with textual-image |
+|---------------------|:-----------:|:-------------:|:------------------------:|
+| Black Box           |          ❌ |            ✅ |                       ✅ |
+| foot                |          ❌ |            ✅ |                       ✅ |
+| GNOME Terminal      |          ❌ |            ❌ |                          |
+| iTerm2              |          ❌ |            ✅ |                       ✅ |
+| kitty               |          ✅ |            ❌ |                       ✅ |
+| konsole             |          ✅ |            ✅ |                       ✅ |
+| tmux                |          ❌ |            ✅ |                       ✅ |
+| Visual Studio Code  |          ❌ |            ✅ |                       ✅ |
+| Warp                |          ❌ |            ❌ |                       ❌ |
+| wezterm             |          ✅ |            ✅ |                       ✅ |
+| Windows Console     |          ❌ |            ❌ |                          |
+| Windows Terminal    |          ❌ |            ✅ |                       ✅ |
+| xterm               |          ❌ |            ✅ |                       ✅ |
+
+✅ = Supported; ❌ = Not Supported
 
 ## Getting Started
 
@@ -58,21 +88,37 @@ Simply run the `main.py` file:
 python main.py
 ```
 
-## 🎮 Controls
+## Controls
 
 - `i`: Focus search input
 - `Enter`: Search / Play selected track
 - `Space`: Play / Pause
 - `n`: Skip to next track
+- `tab`: switch between panels
 - `←` / `→`: Seek backward/forward (10s)
 - `q`: Quit Tuitify
 
-## 🛠️ Project Structure
+Feel Free to change the keybindings to your own preference in `src/tui/keybindings.py`.
+
+## Project Structure
 
 - `src/tui/`: Main TUI application logic and layout.
 - `src/youtube/`: YouTube service, streaming player, and recommendation engine.
 - `src/search/`: Search-specific wrappers.
 
-## 📄 License
+## Contribution
+
+Tuitify is built to grow, and contributions are always welcome.
+
+If you'd like to contribute:
+
+1. Fork the repository
+2. Create a new branch (`feature/your-feature-name`)
+3. Commit your changes
+4. Open a Pull Request
+
+Ideas, discussions, and improvements are always appreciated.
+
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
