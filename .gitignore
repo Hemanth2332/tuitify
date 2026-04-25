@@ -10,4 +10,4 @@ wheels/
 # Virtual environments
 .venv
 .uv-cache/
-test
+test/
