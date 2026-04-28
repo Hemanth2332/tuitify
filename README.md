@@ -83,7 +83,7 @@ As a contributor to [SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’v
 
 Simply run the `main.py` file:
 ```bash
-python main.py
+uv run ./main.py
 ```
 
 ## Controls
