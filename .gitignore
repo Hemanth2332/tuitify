@@ -11,3 +11,5 @@ wheels/
 .venv
 .uv-cache/
 test/
+
+*dist*

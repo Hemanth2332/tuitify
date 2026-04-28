@@ -98,6 +98,21 @@ python main.py
 
 Feel Free to change the keybindings to your own preference in `src/tui/keybindings.py`.
 
+# Single binary file Support:
+Added support for binary file. You can download the binary from Releases
+
+Use this command to create a single binary file from source.
+
+For Windows:
+```bash
+uv run pyinstaller --onefile --add-data "src/tui/styles.tcss;src/tui" main.py
+```
+
+For Linux and Mac:
+```bash
+uv run pyinstaller --onefile --add-data=src/tui/styles.tcss:src/tui main.py
+```
+
 ## Project Structure
 
 - `src/tui/`: Main TUI application logic and layout.
