@@ -95,6 +95,7 @@ uv run ./main.py
 - `tab`: switch between panels
 - `←` / `→`: Seek backward/forward (10s)
 - `q`: Quit Tuitify
+- `t`: cycle through themes
 
 Feel Free to change the keybindings to your own preference in `src/tui/keybindings.py`.
 
@@ -118,6 +119,13 @@ uv run pyinstaller --onefile --add-data=src/tui/styles.tcss:src/tui main.py
 - `src/tui/`: Main TUI application logic and layout.
 - `src/youtube/`: YouTube service, streaming player, and recommendation engine.
 - `src/search/`: Search-specific wrappers.
+
+
+## New Features:
+- Cycle through various themes, made them persistent
+- Made user feedback when fetching for results.
+- Made UI screen 70/30 ratio for better UX
+- Added a cache layer (not persistent) to speed up searching.
 
 ## Contribution
 
