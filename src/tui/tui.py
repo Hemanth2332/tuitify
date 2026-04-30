@@ -107,15 +107,21 @@ class Tuitify(App):
         self.start_playback(next_track)
 
     def action_seek_backward(self) -> None:
+        if self.query_one("#search-input", Input).has_focus:
+            return
         self._seek_relative_ms(-10_000)
 
     def action_seek_forward(self) -> None:
+        if self.query_one("#search-input", Input).has_focus:
+            return
         self._seek_relative_ms(10_000)
 
     def action_focus_input(self) -> None:
         self.query_one("#search-input", Input).focus()
 
     def action_cursor_up(self) -> None:
+        if self.query_one("#search-input", Input).has_focus:
+            return
         list_view = self.query_one("#search-results", ListView)
         if not list_view.children:
             return
@@ -124,9 +130,11 @@ class Tuitify(App):
         if list_view.index is None:
             list_view.index = 0
             return
-        list_view.move_cursor_up()
+        list_view.action_cursor_up()
 
     def action_cursor_down(self) -> None:
+        if self.query_one("#search-input", Input).has_focus:
+            return
         list_view = self.query_one("#search-results", ListView)
         if not list_view.children:
             return
@@ -135,7 +143,7 @@ class Tuitify(App):
         if list_view.index is None:
             list_view.index = 0
             return
-        list_view.move_cursor_down()
+        list_view.action_cursor_down()
 
 
 
