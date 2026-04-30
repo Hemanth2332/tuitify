@@ -18,7 +18,7 @@
 
 Users can search for music or podcasts, instantly stream audio using VLC-backed playback, and continue listening through an automatically generated recommendation queue based on the currently playing track. Album artwork, progress tracking, next-up previews, playback controls, and keyboard shortcuts make the experience smooth, responsive, and practical for daily use.
 
-![UI](images/screenshot_1.png)
+![UI](images/screenshot_2.png)
 
 ## Why Tuitify?
 
