@@ -5,6 +5,7 @@ BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("tab", "focus_next", "Next Panel", show=False),
         Binding("i", "focus_input", "Focus Input", show=True),
+        Binding("t", "cycle_theme", "Theme", show=True),
         Binding("space", "toggle_pause", "Play/Pause", show=True),
         Binding("n", "next_track", "Next", show=True),
         Binding("left", "seek_backward", "← Back 10s", show=True),

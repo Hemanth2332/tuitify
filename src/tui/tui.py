@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import io
+import json
+import time
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -23,11 +26,12 @@ class Tuitify(App):
     BINDINGS = BINDINGS
 
     CSS_PATH = "styles.tcss"
+    THEME_SETTINGS_PATH = Path(__file__).with_name("settings.json")
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.searcher = YoutubeSearcher(default_results=25)
+        self.searcher = YoutubeSearcher(default_results=20)
         self.player = YTStreamVLC()
         self.radio = RadioEngine()
 
@@ -37,6 +41,9 @@ class Tuitify(App):
         self.current_track: dict[str, Any] | None = None
         self.current_duration_seconds: int = 0
         self.playback_nonce = 0
+        self.search_in_progress = False
+        self.search_cache: dict[str, list[dict[str, Any]]] = {}
+        self.theme_names: list[str] = []
 
 
     def compose(self):
@@ -45,7 +52,7 @@ class Tuitify(App):
         with Vertical(id="main-layout"):
             with Horizontal(id="top-panels"):
                 # Search Panel
-                with VerticalScroll(classes="panel"):
+                with VerticalScroll(id="search-panel", classes="panel"):
                     with Horizontal(id="search-controls"):
                         yield Select(
                             options=[("Music", "music"), ("Podcast", "podcast")],
@@ -61,7 +68,7 @@ class Tuitify(App):
                         yield ListView(id="search-results", classes="search-results")
 
                 # Player Panel
-                with Vertical(classes="panel"):
+                with Vertical(id="player-panel", classes="panel"):
                     yield Static("Player")
 
                     with Container(id="art-frame", classes="art-frame"):
@@ -77,6 +84,8 @@ class Tuitify(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        self._initialize_themes()
+        self._restore_theme()
         self.set_interval(0.5, self._refresh_player_progress)
         self.action_focus_input()
 
@@ -118,6 +127,23 @@ class Tuitify(App):
 
     def action_focus_input(self) -> None:
         self.query_one("#search-input", Input).focus()
+
+    def action_cycle_theme(self) -> None:
+        if not self.theme_names:
+            self.notify("No themes available.", severity="warning")
+            return
+
+        current_theme = str(self.theme or "")
+        if current_theme in self.theme_names:
+            current_index = self.theme_names.index(current_theme)
+            next_index = (current_index + 1) % len(self.theme_names)
+        else:
+            next_index = 0
+
+        next_theme = self.theme_names[next_index]
+        self.theme = next_theme
+        self._save_theme(next_theme)
+        self.notify(f"Theme: {next_theme}", severity="information")
 
     def action_cursor_up(self) -> None:
         if self.query_one("#search-input", Input).has_focus:
@@ -165,8 +191,11 @@ class Tuitify(App):
 
     # Search function
     def action_search(self):
+        if self.search_in_progress:
+            self.notify("Search already in progress...", severity="warning")
+            return
+
         query = self.query_one("#search-input", Input).value
-        self.query_one("#search-input", Input).clear()
 
         if not query.strip():
             self.notify("Enter a query", "warning")
@@ -175,15 +204,77 @@ class Tuitify(App):
         mode = str(self.query_one("#media-select", Select).value or "music").lower()
         prefix = "music" if mode == "music" else "podcast"
         full_query = f"{prefix} {query}".strip()
+        cache_key = " ".join(full_query.lower().split())
 
-        self.search_results = self.searcher.search_media_details(full_query)
+        cached_results = self.search_cache.get(cache_key)
+        if cached_results is not None:
+            self.search_results = cached_results
+            self.render_search_results()
+            self.query_one("#search-results", ListView).focus()
+            self.notify(
+                f"Loaded {len(cached_results)} cached results",
+                severity="information",
+            )
+            return
+
+        self._run_search(full_query)
+
+    @work(exclusive=True, thread=True, group="search")
+    def _run_search(self, query: str) -> None:
+        self.search_in_progress = True
+        self.call_from_thread(self._set_search_loading, True)
+        started_at = time.perf_counter()
+        try:
+            results = self.searcher.search_media_details(query)
+        except Exception as error:
+            self.call_from_thread(
+                self.notify, f"Search failed: {error}", severity="error"
+            )
+            results = []
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        self.call_from_thread(self._set_search_results, query, results, elapsed_ms)
+        self.search_in_progress = False
+
+    def _set_search_loading(self, is_loading: bool) -> None:
+        results_view = self.query_one("#search-results", ListView)
+        media_type = "Music" if str(self.query_one("#media-select", Select).value) == "music" else "Podcast"
+
+        if is_loading:
+            results_view.clear()
+            results_view.append(
+                ListItem(
+                    Static(
+                        f"Searching {media_type.lower()} ... please wait",
+                        classes="result-line",
+                    )
+                )
+            )
+        else:
+            results_view.clear()
+
+    def _set_search_results(
+        self, query: str, results: list[dict[str, Any]], elapsed_ms: int
+    ) -> None:
+        self._set_search_loading(False)
+        self.search_results = results
+        cache_key = " ".join(query.lower().split())
+        self.search_cache[cache_key] = results
+        if len(self.search_cache) > 30:
+            oldest_key = next(iter(self.search_cache))
+            self.search_cache.pop(oldest_key, None)
         self.render_search_results()
-
         self.query_one("#search-results", ListView).focus()
+        self.notify(
+            f"Loaded {len(results)} results in {elapsed_ms} ms",
+            severity="information",
+        )
 
     def render_search_results(self):
         results_view = self.query_one("#search-results", ListView)
         results_view.clear()
+        title_width = 44
+        channel_width = 28
 
         for idx, track in enumerate(self.search_results, start=1):
             title = str(track.get("title", "Unknown Title"))
@@ -195,36 +286,32 @@ class Tuitify(App):
                 or ""
             )
 
-            if len(title) > 30:
-                title = title[:27] + "..."
-
             duration = track.get("duration")
             if duration:
                 duration_str = str(track.get("total_play_time") or "00:00")
             else:
                 duration_str = "LIVE"
 
+            display_title = title if len(title) <= title_width else title[: title_width - 3] + "..."
+            display_channel = (
+                channel if len(channel) <= channel_width else channel[: channel_width - 3] + "..."
+            )
+
             line = Text()
             line.append(f"{idx:>2}  ", style="bold #56B6C6")
-            line.append(title, style="bold")
-            if channel:
-                line.append("  ")
-                line.append("│ ", style="dim")
-                line.append(channel, style="dim")
-            line.append("  ")
-            line.append("│ ", style="dim")
+            line.append(f"{display_title:<{title_width}}", style="bold")
+            line.append("  | ", style="dim")
+            line.append(f"{display_channel:<{channel_width}}", style="dim")
+            line.append("  | ", style="dim")
             line.append(duration_str, style="bold #98C379")
-
-            display_text = line
 
             list_item = ListItem(
                 Static(
-                    display_text,
+                    line,
                     classes="result-line",
                     expand=False,
                 )
             )
-
             results_view.append(list_item)
 
         if results_view.children:
@@ -412,3 +499,51 @@ class Tuitify(App):
             return f"{hours}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
+    def _initialize_themes(self) -> None:
+        available = getattr(self, "available_themes", None)
+        names: list[str] = []
+        if isinstance(available, dict):
+            names = sorted([str(name) for name in available.keys() if name])
+        elif isinstance(available, (list, tuple, set)):
+            names = sorted([str(name) for name in available if name])
+
+        if not names:
+            names = ["textual-dark", "textual-light"]
+        self.theme_names = names
+
+    def _restore_theme(self) -> None:
+        settings = self._load_settings()
+        theme_name = settings.get("theme")
+        if not isinstance(theme_name, str):
+            return
+        if theme_name not in self.theme_names:
+            return
+
+        self.theme = theme_name
+
+    def _save_theme(self, theme_name: str) -> None:
+        settings = self._load_settings()
+        settings["theme"] = theme_name
+        self._write_settings(settings)
+
+    def _load_settings(self) -> dict[str, Any]:
+        path = self.THEME_SETTINGS_PATH
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+        if isinstance(data, dict):
+            return data
+        return {}
+
+    def _write_settings(self, settings: dict[str, Any]) -> None:
+        path = self.THEME_SETTINGS_PATH
+        try:
+            path.write_text(
+                json.dumps(settings, indent=2, ensure_ascii=True),
+                encoding="utf-8",
+            )
+        except Exception:
+            self.notify("Could not save theme settings.", severity="warning")

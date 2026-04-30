@@ -15,8 +15,15 @@ Screen {
     .panel {
         border: round #3c3f46;
         padding: 1;
-        width: 1fr;
         height: 1fr;
+    }
+
+    #search-panel {
+        width: 7fr;
+    }
+
+    #player-panel {
+        width: 3fr;
     }
 
     .search-result-view{
