@@ -122,9 +122,9 @@ uv run pyinstaller --onefile --add-data=src/tui/styles.tcss:src/tui main.py
 
 
 ## New Features:
-- Cycle through various themes, made them persistent
-- Made user feedback when fetching for results.
-- Made UI screen 70/30 ratio for better UX
+- Cycle through various themes. They are persistent in nature.
+- Give User feedback when fetching for results.
+- Made UI screen 70/30 ratio for better UX.
 - Added a cache layer (not persistent) to speed up searching.
 
 ## Contribution
