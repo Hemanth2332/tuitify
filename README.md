@@ -36,6 +36,9 @@ As a contributor to [SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’v
 - **High-Quality Audio**: Uses `yt-dlp` and `vlc` for reliable and high-quality streaming.
 - **Keyboard Centric**: Optimized for efficiency with customizable keybindings.
 - **Album Art**: Real-time display of track artwork in your terminal.
+- **Theme Support**: Cycle through various themes with persistent preferences.
+- **Smart UI**: 70/30 layout ratio for better UX and real-time user feedback during search operations.
+- **Performance Cache**: Built-in cache layer to speed up repeated searches.
 
 ### Support Matrix
 
@@ -120,12 +123,6 @@ uv run pyinstaller --onefile --add-data=src/tui/styles.tcss:src/tui main.py
 - `src/youtube/`: YouTube service, streaming player, and recommendation engine.
 - `src/search/`: Search-specific wrappers.
 
-
-## New Features:
-- Cycle through various themes. They are persistent in nature.
-- Give User feedback when fetching for results.
-- Made UI screen 70/30 ratio for better UX.
-- Added a cache layer (not persistent) to speed up searching.
 
 ## Contribution
 
