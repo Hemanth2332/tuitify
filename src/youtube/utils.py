@@ -41,6 +41,20 @@ def normalize_title(title: str) -> str:
     return " ".join(normalized.split())
 
 
+def normalize_artist_name(name: str | None) -> str:
+    normalized = str(name or "").lower()
+    normalized = re.sub(r"[^a-z0-9 ]", "", normalized)
+    return " ".join(normalized.split())
+
+
+def track_signature(track: dict[str, Any]) -> str:
+    title = normalize_title(str(track.get("title") or ""))
+    artist = normalize_artist_name(track.get("artist_name"))
+    if artist:
+        return f"{artist}::{title}"
+    return title
+
+
 def is_real_song(track: dict[str, Any]) -> bool:
     title = str(track.get("title", "")).lower()
     banned_keywords = (

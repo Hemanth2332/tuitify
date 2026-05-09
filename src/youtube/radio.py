@@ -3,33 +3,8 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from .utils import clean_tracks, normalize_title, parse_recommendations
+from .utils import clean_tracks, normalize_title, parse_recommendations, track_signature
 from .service import YouTubeService
-
-
-DISCOVERY_QUERIES = (
-    "indie",
-    "dream pop",
-    "shoegaze",
-    "folk",
-    "lofi",
-    "ambient",
-    "alt rock",
-    "synthpop",
-    "jazz",
-    "instrumental",
-    "acoustic",
-    "electronic",
-    "soul",
-    "funk",
-    "world music",
-    "chill",
-    "underrated songs",
-    "new music",
-    "hidden gems",
-    "random songs",
-)
-
 
 class RadioEngine:
     """Manages queue + recommendation-based continuation."""
@@ -52,6 +27,11 @@ class RadioEngine:
         self.history.append(track)
         if len(self.history) > self.history_limit:
             self.history.pop(0)
+        self.queue = [
+            queued_track
+            for queued_track in self.queue
+            if track_signature(queued_track) != track_signature(track)
+        ]
 
     def fetch_next_from_seed(self, seed: dict[str, Any]) -> list[dict[str, Any]]:
         video_id = seed.get("id")
@@ -59,14 +39,24 @@ class RadioEngine:
             return []
 
         recommendations = self._fetch_related_recommendations(seed)
-        recommendations.extend(self._fetch_discovery_recommendations(seed))
-
         recommendations = clean_tracks(recommendations)
 
         seen_ids = {track.get("id") for track in self.history}
+        queued_ids = {
+            track.get("id") for track in self.queue if track.get("id")
+        }
+        recent_signatures = {track_signature(track) for track in self.history}
+        queued_signatures = {track_signature(track) for track in self.queue}
         seen_ids.add(video_id)
+        recent_signatures.add(track_signature(seed))
         filtered = [
-            track for track in recommendations if track.get("id") and track["id"] not in seen_ids
+            track
+            for track in recommendations
+            if track.get("id")
+            and track["id"] not in seen_ids
+            and track["id"] not in queued_ids
+            and track_signature(track) not in recent_signatures
+            and track_signature(track) not in queued_signatures
         ]
         seed_title = normalize_title(str(seed.get("title") or ""))
         return [
@@ -107,24 +97,6 @@ class RadioEngine:
 
         return related
 
-    def _fetch_discovery_recommendations(self, seed: dict[str, Any]) -> list[dict[str, Any]]:
-        combined: list[dict[str, Any]] = []
-        queries = self._build_discovery_queries(seed)
-        for query in queries:
-            try:
-                results = self.service.search_songs(
-                    query=query,
-                    num_results=max(self.recommendation_limit // 3, 6),
-                )
-            except Exception:
-                continue
-            for track in results:
-                track["discovery_candidate"] = True
-            combined.extend(results)
-            if len(combined) >= max(6, self.recommendation_limit // 2):
-                break
-        return combined
-
     def _build_related_queries(self, seed: dict[str, Any]) -> list[str]:
         artist_name = " ".join(str(seed.get("artist_name") or "").split())
         title = normalize_title(str(seed.get("title") or ""))
@@ -147,24 +119,13 @@ class RadioEngine:
 
         return unique_queries
 
-    def _build_discovery_queries(self, seed: dict[str, Any]) -> list[str]:
-        sampled = random.sample(
-            DISCOVERY_QUERIES,
-            k=min(4, len(DISCOVERY_QUERIES)),
-        )
-        seed_artist = " ".join(str(seed.get("artist_name") or "").split())
-        if seed_artist:
-            sampled.append(f"{random.choice(DISCOVERY_QUERIES)} {seed_artist}")
-        return sampled
-
     def choose_next(
         self, candidates: list[dict[str, Any]], seed: dict[str, Any] | None = None
     ) -> dict[str, Any] | None:
         if not candidates:
             return None
 
-        discovery_tracks = [track for track in candidates if track.get("discovery_candidate")]
-        related_tracks = [track for track in candidates if not track.get("discovery_candidate")]
+        related_tracks = candidates
         same_artist_related: list[dict[str, Any]] = []
         style_related: list[dict[str, Any]] = []
 
@@ -179,16 +140,8 @@ class RadioEngine:
         else:
             style_related = related_tracks
 
-        if discovery_tracks and random.random() < 0.2:
-            ranked_discovery = sorted(
-                discovery_tracks,
-                key=lambda track: self._score_track(track, seed=seed),
-                reverse=True,
-            )
-            return random.choice(ranked_discovery[: min(8, len(ranked_discovery))])
-
         if style_related and same_artist_related:
-            pool = style_related if random.random() < 0.45 else same_artist_related
+            pool = style_related if random.random() < 0.2 else same_artist_related
         else:
             pool = style_related or same_artist_related or related_tracks or candidates
         ranked = sorted(
@@ -225,5 +178,5 @@ class RadioEngine:
             seed_artist = str(seed.get("artist_name") or "").strip().lower()
             track_artist = str(track.get("artist_name") or "").strip().lower()
             if seed_artist and track_artist == seed_artist:
-                score -= 2.0
+                score += 1.5
         return score
