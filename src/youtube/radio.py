@@ -3,8 +3,32 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from .utils import clean_tracks, parse_recommendations
+from .utils import clean_tracks, normalize_title, parse_recommendations
 from .service import YouTubeService
+
+
+DISCOVERY_QUERIES = (
+    "indie",
+    "dream pop",
+    "shoegaze",
+    "folk",
+    "lofi",
+    "ambient",
+    "alt rock",
+    "synthpop",
+    "jazz",
+    "instrumental",
+    "acoustic",
+    "electronic",
+    "soul",
+    "funk",
+    "world music",
+    "chill",
+    "underrated songs",
+    "new music",
+    "hidden gems",
+    "random songs",
+)
 
 
 class RadioEngine:
@@ -34,28 +58,148 @@ class RadioEngine:
         if not video_id:
             return []
 
-        try:
-            data = self.service.fetch_recommendations(video_id)
-        except Exception:
-            return []
+        recommendations = self._fetch_related_recommendations(seed)
+        recommendations.extend(self._fetch_discovery_recommendations(seed))
 
-        recommendations = parse_recommendations(data, limit=self.recommendation_limit)
         recommendations = clean_tracks(recommendations)
 
         seen_ids = {track.get("id") for track in self.history}
         seen_ids.add(video_id)
-        return [
+        filtered = [
             track for track in recommendations if track.get("id") and track["id"] not in seen_ids
         ]
+        seed_title = normalize_title(str(seed.get("title") or ""))
+        return [
+            track
+            for track in filtered
+            if normalize_title(str(track.get("title") or "")) != seed_title
+        ]
 
-    def choose_next(self, candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+    def _fetch_related_recommendations(self, seed: dict[str, Any]) -> list[dict[str, Any]]:
+        video_id = seed.get("id")
+        if not video_id:
+            return []
+
+        related: list[dict[str, Any]] = []
+
+        for query in self._build_related_queries(seed):
+            try:
+                related.extend(
+                    self.service.search_songs(
+                        query=query,
+                        num_results=max(self.recommendation_limit // 2, 8),
+                    )
+                )
+            except Exception:
+                continue
+            if len(related) >= self.recommendation_limit * 2:
+                break
+
+        try:
+            data = self.service.fetch_recommendations(video_id)
+        except Exception:
+            data = None
+
+        if data is not None:
+            related.extend(
+                parse_recommendations(data, limit=self.recommendation_limit)
+            )
+
+        return related
+
+    def _fetch_discovery_recommendations(self, seed: dict[str, Any]) -> list[dict[str, Any]]:
+        combined: list[dict[str, Any]] = []
+        queries = self._build_discovery_queries(seed)
+        for query in queries:
+            try:
+                results = self.service.search_songs(
+                    query=query,
+                    num_results=max(self.recommendation_limit // 3, 6),
+                )
+            except Exception:
+                continue
+            for track in results:
+                track["discovery_candidate"] = True
+            combined.extend(results)
+            if len(combined) >= max(6, self.recommendation_limit // 2):
+                break
+        return combined
+
+    def _build_related_queries(self, seed: dict[str, Any]) -> list[str]:
+        artist_name = " ".join(str(seed.get("artist_name") or "").split())
+        title = normalize_title(str(seed.get("title") or ""))
+        album_name = " ".join(str(seed.get("album_name") or "").split())
+
+        queries = [
+            " ".join(part for part in (artist_name, title) if part).strip(),
+            " ".join(part for part in (title, album_name) if part).strip(),
+            title,
+        ]
+
+        seen: set[str] = set()
+        unique_queries: list[str] = []
+        for query in queries:
+            normalized_query = " ".join(query.lower().split())
+            if not normalized_query or normalized_query in seen:
+                continue
+            seen.add(normalized_query)
+            unique_queries.append(query)
+
+        return unique_queries
+
+    def _build_discovery_queries(self, seed: dict[str, Any]) -> list[str]:
+        sampled = random.sample(
+            DISCOVERY_QUERIES,
+            k=min(4, len(DISCOVERY_QUERIES)),
+        )
+        seed_artist = " ".join(str(seed.get("artist_name") or "").split())
+        if seed_artist:
+            sampled.append(f"{random.choice(DISCOVERY_QUERIES)} {seed_artist}")
+        return sampled
+
+    def choose_next(
+        self, candidates: list[dict[str, Any]], seed: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
         if not candidates:
             return None
 
-        ranked = sorted(candidates, key=self._score_track, reverse=True)
+        discovery_tracks = [track for track in candidates if track.get("discovery_candidate")]
+        related_tracks = [track for track in candidates if not track.get("discovery_candidate")]
+        same_artist_related: list[dict[str, Any]] = []
+        style_related: list[dict[str, Any]] = []
+
+        if seed and related_tracks:
+            seed_artist = str(seed.get("artist_name") or "").strip().lower()
+            for track in related_tracks:
+                track_artist = str(track.get("artist_name") or "").strip().lower()
+                if seed_artist and track_artist == seed_artist:
+                    same_artist_related.append(track)
+                else:
+                    style_related.append(track)
+        else:
+            style_related = related_tracks
+
+        if discovery_tracks and random.random() < 0.2:
+            ranked_discovery = sorted(
+                discovery_tracks,
+                key=lambda track: self._score_track(track, seed=seed),
+                reverse=True,
+            )
+            return random.choice(ranked_discovery[: min(8, len(ranked_discovery))])
+
+        if style_related and same_artist_related:
+            pool = style_related if random.random() < 0.45 else same_artist_related
+        else:
+            pool = style_related or same_artist_related or related_tracks or candidates
+        ranked = sorted(
+            pool,
+            key=lambda track: self._score_track(track, seed=seed),
+            reverse=True,
+        )
+        top_window = ranked[: min(10, len(ranked))]
         if random.random() < self.exploration_rate:
             return random.choice(ranked)
-        return ranked[0]
+        return random.choice(top_window)
 
     def next_track(self, seed: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if seed is None:
@@ -64,15 +208,22 @@ class RadioEngine:
             seed = self.history[-1]
 
         candidates = self.fetch_next_from_seed(seed)
-        next_song = self.choose_next(candidates)
+        next_song = self.choose_next(candidates, seed=seed)
         if next_song:
             self.queue.append(next_song)
         return next_song
 
     @staticmethod
-    def _score_track(track: dict[str, Any]) -> float:
-        score = random.random()
+    def _score_track(track: dict[str, Any], seed: dict[str, Any] | None = None) -> float:
+        score = random.random() * 3.0
         duration = track.get("duration")
         if duration and 120 <= duration <= 320:
+            score += 1.0
+        if track.get("source") == "ytmusic_song":
             score += 2.0
+        if seed:
+            seed_artist = str(seed.get("artist_name") or "").strip().lower()
+            track_artist = str(track.get("artist_name") or "").strip().lower()
+            if seed_artist and track_artist == seed_artist:
+                score -= 2.0
         return score

@@ -57,13 +57,26 @@ def is_real_song(track: dict[str, Any]) -> bool:
         "best of",
         "loop",
         "extended",
+        "podcast",
+        "episode",
+        "interview",
+        "reaction",
+        "talk show",
+        "comedy",
+        "stand up",
+        "trailer",
+        "speech",
+        "debate",
     )
 
     if any(keyword in title for keyword in banned_keywords):
         return False
 
     duration = track.get("duration")
-    return not duration or duration <= 600
+    if duration and duration > 600:
+        return False
+
+    return True
 
 
 def parse_recommendations(data: dict[str, Any], limit: int = 30) -> list[dict[str, Any]]:
@@ -106,6 +119,30 @@ def clean_tracks(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         cleaned.append(track)
 
     return cleaned
+
+
+def build_related_song_queries(seed: dict[str, Any]) -> list[str]:
+    artist_name = " ".join(str(seed.get("artist_name") or "").split())
+    title = " ".join(str(seed.get("title") or "").split())
+
+    queries: list[str] = []
+    if artist_name and title:
+        queries.append(f"{artist_name} {normalize_title(title)}".strip())
+    if artist_name:
+        queries.append(artist_name)
+    if title:
+        queries.append(normalize_title(title))
+
+    seen: set[str] = set()
+    unique_queries: list[str] = []
+    for query in queries:
+        normalized_query = " ".join(query.lower().split())
+        if not normalized_query or normalized_query in seen:
+            continue
+        seen.add(normalized_query)
+        unique_queries.append(query)
+
+    return unique_queries
 
 
 def _safe_secondary_results(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -163,11 +200,33 @@ def _parse_compact_item(item: dict[str, Any]) -> dict[str, Any] | None:
     title = "".join(part.get("text", "") for part in title_runs) or None
     duration_text = compact.get("lengthText", {}).get("simpleText")
     duration = parse_duration(duration_text)
-    return _build_track(video_id=video_id, title=title, duration=duration)
+    artist_name = _parse_compact_artist(compact)
+    return _build_track(
+        video_id=video_id,
+        title=title,
+        duration=duration,
+        artist_name=artist_name,
+    )
+
+
+def _parse_compact_artist(compact: dict[str, Any]) -> str | None:
+    candidate_fields = (
+        compact.get("shortBylineText", {}).get("runs", []),
+        compact.get("longBylineText", {}).get("runs", []),
+        compact.get("ownerText", {}).get("runs", []),
+    )
+    for runs in candidate_fields:
+        text = "".join(part.get("text", "") for part in runs).strip()
+        if text:
+            return text
+    return None
 
 
 def _build_track(
-    video_id: str | None, title: str | None, duration: int | None
+    video_id: str | None,
+    title: str | None,
+    duration: int | None,
+    artist_name: str | None = None,
 ) -> dict[str, Any] | None:
     if not video_id or not title:
         return None
@@ -176,4 +235,5 @@ def _build_track(
         "title": title,
         "url": f"https://www.youtube.com/watch?v={video_id}",
         "duration": duration,
+        "artist_name": artist_name,
     }

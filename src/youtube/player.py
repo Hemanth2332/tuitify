@@ -19,7 +19,13 @@ class YTStreamVLC:
     ):
         self.service = service or YouTubeService()
         self.poll_interval = poll_interval
-        self.instance = vlc.Instance("--no-video")
+        self.instance = vlc.Instance(
+            "--no-video",
+            "--intf=dummy",
+            "--quiet",
+            "--verbose=-1",
+            "--no-media-library",
+        )
         self.player = self.instance.media_player_new()
 
     def play_track(

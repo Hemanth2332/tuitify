@@ -202,9 +202,8 @@ class Tuitify(App):
             return
 
         mode = str(self.query_one("#media-select", Select).value or "music").lower()
-        prefix = "music" if mode == "music" else "podcast"
-        full_query = f"{prefix} {query}".strip()
-        cache_key = " ".join(full_query.lower().split())
+        full_query = query.strip() if mode == "music" else f"podcast {query}".strip()
+        cache_key = f"{mode}:" + " ".join(full_query.lower().split())
 
         cached_results = self.search_cache.get(cache_key)
         if cached_results is not None:
@@ -217,15 +216,15 @@ class Tuitify(App):
             )
             return
 
-        self._run_search(full_query)
+        self._run_search(full_query, mode)
 
     @work(exclusive=True, thread=True, group="search")
-    def _run_search(self, query: str) -> None:
+    def _run_search(self, query: str, mode: str) -> None:
         self.search_in_progress = True
         self.call_from_thread(self._set_search_loading, True)
         started_at = time.perf_counter()
         try:
-            results = self.searcher.search_media_details(query)
+            results = self.searcher.search_media_details(query, media_type=mode)
         except Exception as error:
             self.call_from_thread(
                 self.notify, f"Search failed: {error}", severity="error"
@@ -233,7 +232,7 @@ class Tuitify(App):
             results = []
 
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-        self.call_from_thread(self._set_search_results, query, results, elapsed_ms)
+        self.call_from_thread(self._set_search_results, query, mode, results, elapsed_ms)
         self.search_in_progress = False
 
     def _set_search_loading(self, is_loading: bool) -> None:
@@ -254,11 +253,15 @@ class Tuitify(App):
             results_view.clear()
 
     def _set_search_results(
-        self, query: str, results: list[dict[str, Any]], elapsed_ms: int
+        self,
+        query: str,
+        mode: str,
+        results: list[dict[str, Any]],
+        elapsed_ms: int,
     ) -> None:
         self._set_search_loading(False)
         self.search_results = results
-        cache_key = " ".join(query.lower().split())
+        cache_key = f"{mode}:" + " ".join(query.lower().split())
         self.search_cache[cache_key] = results
         if len(self.search_cache) > 30:
             oldest_key = next(iter(self.search_cache))
@@ -273,7 +276,7 @@ class Tuitify(App):
     def render_search_results(self):
         results_view = self.query_one("#search-results", ListView)
         results_view.clear()
-        title_width = 44
+        title_width = 20
         channel_width = 28
 
         for idx, track in enumerate(self.search_results, start=1):
@@ -334,10 +337,15 @@ class Tuitify(App):
             try:
                 end_state = self.player.play_track(current_track, retry_on_error=True)
             except Exception as error:
-                self.call_from_thread(
-                    self.notify, f"Playback failed: {error}", severity="error"
-                )
-                return
+                next_track = self._pop_recommendation()
+                if not next_track:
+                    next_track = self.radio.next_track(seed=current_track)
+
+                if not next_track:
+                    return
+
+                current_track = next_track
+                continue
 
             if nonce != self.playback_nonce:
                 return

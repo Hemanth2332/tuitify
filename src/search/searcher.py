@@ -15,6 +15,13 @@ class YoutubeSearcher:
         return self._service.search(query=query, num_results=num_results)
 
     def search_media_details(
-        self, query: str, num_results: int | None = None
+        self,
+        query: str,
+        num_results: int | None = None,
+        media_type: str = "music",
     ) -> list[dict[str, Any]]:
-        return self._service.search_media_details(query=query, num_results=num_results)
+        return self._service.search_media_details(
+            query=query,
+            num_results=num_results,
+            media_type=media_type,
+        )
