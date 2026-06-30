@@ -36,7 +36,10 @@ class YouTubeService:
         count = num_results if num_results is not None else self.default_results
         search_query = f"ytsearch{count}:{query}"
 
-        with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
+        opts = dict(self._ydl_opts)
+        opts["extract_flat"] = True
+
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(search_query, download=False)
             entries = info.get("entries", [])
             return [entry for entry in entries if entry]
@@ -111,12 +114,24 @@ class YouTubeService:
             or "Unknown artist"
         )
         video_id = entry.get("id") or entry.get("video_id")
-        url = entry.get("webpage_url")
+        
+        # When extract_flat=True, webpage_url is usually not populated,
+        # but url contains the webpage url.
+        url = entry.get("webpage_url") or entry.get("url")
+        if not url and video_id:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+
+        thumbnail = entry.get("thumbnail")
+        if not thumbnail and entry.get("thumbnails"):
+            thumbnail = entry["thumbnails"][-1].get("url")
+
+        if thumbnail and "?" in thumbnail:
+            thumbnail = thumbnail.split("?")[0]
 
         return {
             "id": video_id,
             "title": entry.get("title", "Unknown title"),
-            "thumbnail": entry.get("thumbnail"),
+            "thumbnail": thumbnail,
             "url": url,
             "total_play_time": YouTubeService._format_duration(duration_seconds),
             "duration": duration_seconds,

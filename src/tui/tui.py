@@ -333,6 +333,7 @@ class Tuitify(App):
                     expand=False,
                 )
             )
+            list_item.tooltip = title
             results_view.append(list_item)
 
         if results_view.children:
