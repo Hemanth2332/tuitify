@@ -75,10 +75,10 @@ class YouTubeService:
         entries = self.search(query=query, num_results=num_results)
         return [self._to_media_detail(entry) for entry in entries]
 
-    def get_stream_info(self, video_url: str) -> tuple[str, int | None]:
+    def get_stream_info(self, video_url: str) -> tuple[str, int | None, list[str]]:
         with yt_dlp.YoutubeDL(self._ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=False)
-            return info["url"], info.get("duration")
+            return info["url"], info.get("duration"), info.get("tags", [])
 
     def fetch_recommendations(
         self, video_id: str, timeout: int = 20

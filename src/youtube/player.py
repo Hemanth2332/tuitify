@@ -25,6 +25,8 @@ class YTStreamVLC:
             "--quiet",
             "--verbose=-1",
             "--no-media-library",
+            "--network-caching=10000",
+            "--file-caching=10000",
         )
         self.player = self.instance.media_player_new()
         self.player.audio_set_volume(80)
@@ -53,7 +55,8 @@ class YTStreamVLC:
                     stream_url = prefetched_stream_url
                     use_prefetched_stream = False
                 else:
-                    stream_url, _duration = self.service.get_stream_info(video_url)
+                    stream_url, _duration, tags = self.service.get_stream_info(video_url)
+                    track["tags"] = tags
                 self._start_stream(stream_url, resume_position_ms)
                 return self._monitor_until_finished(
                     known_duration_seconds=known_duration,

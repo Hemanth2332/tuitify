@@ -53,6 +53,9 @@ def normalize_title(title: str) -> str:
 
 def normalize_artist_name(name: str | None) -> str:
     normalized = str(name or "").lower()
+    normalized = re.sub(r"\s*-\s*topic$", "", normalized)
+    normalized = re.sub(r"vevo$", "", normalized)
+    normalized = re.sub(r"\s*official\s*$", "", normalized)
     normalized = re.sub(r"[^a-z0-9 ]", "", normalized)
     return " ".join(normalized.split())
 

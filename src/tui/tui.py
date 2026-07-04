@@ -458,7 +458,8 @@ class Tuitify(App):
             return
 
         try:
-            stream_url, _ = self.player.service.get_stream_info(video_url)
+            stream_url, _, tags = self.player.service.get_stream_info(video_url)
+            next_track["tags"] = tags
             self.prefetched_track = next_track
             self.prefetched_stream_url = stream_url
         except Exception:

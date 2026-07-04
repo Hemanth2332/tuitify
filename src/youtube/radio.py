@@ -107,8 +107,8 @@ class RadioEngine:
 
     def _build_related_queries(self, seed: dict[str, Any]) -> list[str]:
         artist_name = " ".join(str(seed.get("artist_name") or "").split())
-        title = normalize_title(str(seed.get("title") or ""))
-        album_name = " ".join(str(seed.get("album_name") or "").split())
+        title = " ".join(str(seed.get("title") or "").split())
+        
         recent_artists = [
             self._artist_key(track)
             for track in reversed(self.history[-5:])
@@ -119,12 +119,29 @@ class RadioEngine:
             "",
         )
 
-        queries = [
-            " ".join(part for part in (artist_name, title) if part).strip(),
-            " ".join(part for part in (title, album_name) if part).strip(),
-            " ".join(part for part in (session_artist, title) if part).strip(),
-            title,
+        queries = []
+        if artist_name:
+            queries.extend([
+                f"{artist_name} tracks",
+                f"{artist_name} radio",
+            ])
+            if session_artist:
+                queries.append(f"{artist_name} {session_artist}")
+        elif title:
+            queries.append(f"{title} similar songs")
+
+        tags = seed.get("tags") or []
+        useful_tags = [
+            t for t in tags
+            if len(t) > 3
+            and t.lower() not in ("music", "video", "audio", "official", "lyric", "lyrics", "cover", "song")
+            and artist_name.lower() not in t.lower()
         ]
+        if useful_tags:
+            import random
+            selected = random.sample(useful_tags, min(2, len(useful_tags)))
+            for tag in selected:
+                queries.append(f"{tag} music")
 
         seen: set[str] = set()
         unique_queries: list[str] = []
