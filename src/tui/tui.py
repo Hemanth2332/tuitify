@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,7 @@ class Tuitify(App):
         self.theme_names: list[str] = []
         self.prefetched_track: dict[str, Any] | None = None
         self.prefetched_stream_url: str | None = None
+        self.feedback_recorded_signature: str | None = None
 
 
     def compose(self):
@@ -111,6 +113,7 @@ class Tuitify(App):
         if not self.current_track:
             return
 
+        self._record_current_track_feedback(completed=False)
         self.radio.mark_played(self.current_track)
         next_track = self._pop_recommendation()
         if not next_track:
@@ -341,6 +344,7 @@ class Tuitify(App):
 
     def start_playback(self, track: dict[str, Any]) -> None:
         if self.current_track and track_signature(self.current_track) != track_signature(track):
+            self._record_current_track_feedback(completed=False)
             self.radio.mark_played(self.current_track)
         self.playback_nonce += 1
         nonce = self.playback_nonce
@@ -388,6 +392,7 @@ class Tuitify(App):
             if end_state != "ended":
                 return
 
+            self.call_from_thread(self._record_current_track_feedback, True)
             self.radio.mark_played(current_track)
             next_track = self._pop_recommendation()
             if not next_track:
@@ -401,6 +406,7 @@ class Tuitify(App):
     def _set_current_track(self, track: dict[str, Any]) -> None:
         self.current_track = track
         self.current_duration_seconds = int(track.get("duration") or 0)
+        self.feedback_recorded_signature = None
 
         self.query_one("#title", Static).update(str(track.get("title", "Unknown title")))
         self.query_one("#artist", Static).update(str(track.get("artist_name") or "-"))
@@ -552,6 +558,38 @@ class Tuitify(App):
             self.player.player.set_time(target_ms)
         except Exception:
             return
+
+    def _record_current_track_feedback(self, completed: bool) -> None:
+        track = self.current_track
+        if not track:
+            return
+        signature = track_signature(track)
+        if self.feedback_recorded_signature == signature:
+            return
+
+        duration_ms = self.player.total_length_ms()
+        if duration_ms <= 0 and self.current_duration_seconds > 0:
+            duration_ms = self.current_duration_seconds * 1000
+
+        elapsed_ms = self.player.current_time_ms()
+        completion = 0.0
+        if completed:
+            completion = 1.0
+        elif duration_ms > 0:
+            completion = min(max(elapsed_ms / duration_ms, 0.0), 1.0)
+
+        skipped_after_seconds = None
+        if not completed and elapsed_ms > 0:
+            skipped_after_seconds = int(elapsed_ms // 1000)
+
+        self.radio.recommender.record_playback_event(
+            track,
+            completion=completion,
+            replay_count=0,
+            skipped_after_seconds=skipped_after_seconds,
+            played_at=datetime.now(UTC),
+        )
+        self.feedback_recorded_signature = signature
 
     @staticmethod
     def _safe_get(items: list[dict[str, Any]], index: int) -> dict[str, Any] | None:

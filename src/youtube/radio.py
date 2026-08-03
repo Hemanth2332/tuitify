@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import random
+from pathlib import Path
 from typing import Any
+
+from src.recommendations.recommender import PersonalizedRecommender
 
 from .utils import (
     clean_tracks,
+    detect_language_cluster,
     normalize_title,
     parse_recommendations,
     title_token_set,
@@ -24,6 +28,7 @@ class RadioEngine:
         artist_cooldown: int = 3,
         title_cooldown: int = 25,
         album_cooldown: int = 2,
+        recommendation_db_path: str | Path | None = None,
     ):
         self.service = service or YouTubeService()
         self.history_limit = history_limit
@@ -34,6 +39,8 @@ class RadioEngine:
         self.album_cooldown = album_cooldown
         self.history: list[dict[str, Any]] = []
         self.queue: list[dict[str, Any]] = []
+        database_path = Path(recommendation_db_path or Path.cwd() / ".tuitify" / "recommendations.db")
+        self.recommender = PersonalizedRecommender(database_path=database_path)
 
     def mark_played(self, track: dict[str, Any]) -> None:
         if self.history and track_signature(self.history[-1]) == track_signature(track):
@@ -166,6 +173,7 @@ class RadioEngine:
         candidates = self.fetch_next_from_seed(seed)
         if not candidates:
             return []
+        candidates = self.recommender.rank_candidates(candidates)
 
         planned: list[dict[str, Any]] = []
         available = list(candidates)
@@ -232,7 +240,7 @@ class RadioEngine:
         seed: dict[str, Any] | None = None,
         upcoming: list[dict[str, Any]] | None = None,
     ) -> float:
-        score = random.random() * 3.0
+        score = float(track.get("recommendation_score") or 0.0)
         duration = track.get("duration")
         if duration and 120 <= duration <= 320:
             score += 1.0
@@ -258,6 +266,13 @@ class RadioEngine:
                     score -= 3.25
                 elif overlap:
                     score -= overlap * 0.6
+
+            session_cluster = self._dominant_language_cluster()
+            if session_cluster:
+                if detect_language_cluster(track) == session_cluster:
+                    score += 4.8
+                else:
+                    score -= 1.0
 
         recent_history = self.history[-self.title_cooldown :]
         recent_artists = {
@@ -308,3 +323,17 @@ class RadioEngine:
 
         return score
 
+    def _dominant_language_cluster(self) -> str | None:
+        recent_tracks = self.history[-5:]
+        if len(recent_tracks) < 3:
+            return None
+
+        counts: dict[str, int] = {}
+        for item in recent_tracks:
+            cluster = detect_language_cluster(item)
+            counts[cluster] = counts.get(cluster, 0) + 1
+
+        cluster, count = max(counts.items(), key=lambda item: item[1])
+        if count < 2:
+            return None
+        return cluster

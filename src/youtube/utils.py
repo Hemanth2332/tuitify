@@ -22,7 +22,7 @@ def parse_duration(text: str | None) -> int | None:
 
 
 def normalize_title(title: str) -> str:
-    normalized = title.lower()
+    normalized = _repair_mojibake(title).lower()
     normalized = re.sub(r"\(.*?\)", "", normalized)
     normalized = re.sub(r"\[.*?\]", "", normalized)
     normalized = re.sub(r"\b(feat|ft)\.?\s+[a-z0-9 ,&]+\b", "", normalized)
@@ -57,7 +57,7 @@ def normalize_title(title: str) -> str:
 
 
 def normalize_artist_name(name: str | None) -> str:
-    normalized = str(name or "").lower()
+    normalized = _repair_mojibake(str(name or "")).lower()
     normalized = re.sub(r"\s*-\s*topic$", "", normalized)
     normalized = re.sub(r"vevo$", "", normalized)
     normalized = re.sub(r"\s*official\s*$", "", normalized)
@@ -177,9 +177,75 @@ def title_token_set(title: str) -> set[str]:
     return {token for token in normalized.split() if token}
 
 
+def detect_language_cluster(track: dict[str, Any]) -> str:
+    sample = " ".join(
+        part
+        for part in (
+            _repair_mojibake(str(track.get("title") or "")).strip(),
+            _repair_mojibake(str(track.get("artist_name") or "")).strip(),
+        )
+        if part
+    )
+    if not sample:
+        return "latin"
+    raw_sample = " ".join(
+        part
+        for part in (
+            str(track.get("title") or "").strip(),
+            str(track.get("artist_name") or "").strip(),
+        )
+        if part
+    )
+    if "à®" in raw_sample:
+        return "tamil"
+    if "à¤" in raw_sample or "à¥" in raw_sample:
+        return "devanagari"
+
+    buckets: dict[str, int] = {
+        "tamil": 0,
+        "devanagari": 0,
+        "latin": 0,
+        "other": 0,
+    }
+    for char in sample:
+        if char.isspace():
+            continue
+        codepoint = ord(char)
+        if 0x0B80 <= codepoint <= 0x0BFF:
+            buckets["tamil"] += 1
+        elif 0x0900 <= codepoint <= 0x097F:
+            buckets["devanagari"] += 1
+        elif "LATIN" in unicodedata.name(char, ""):
+            buckets["latin"] += 1
+        else:
+            buckets["other"] += 1
+
+    if buckets["tamil"] > 0 or buckets["devanagari"] > 0:
+        native_buckets = {
+            "tamil": buckets["tamil"],
+            "devanagari": buckets["devanagari"],
+        }
+        return max(native_buckets, key=native_buckets.get)
+
+    return max(buckets, key=buckets.get)
+
+
 def _is_word_character(char: str) -> bool:
     category = unicodedata.category(char)
-    return category[0] in {"L", "N"}
+    return category[0] in {"L", "M", "N"}
+
+
+def _repair_mojibake(text: str) -> str:
+    if not text:
+        return text
+    suspicious = sum(1 for char in text if 0x00A0 <= ord(char) <= 0x00FF)
+    if suspicious < max(2, len(text) // 6):
+        return text
+    try:
+        repaired = text.encode("latin1").decode("utf-8")
+    except Exception:
+        return text
+    return repaired
 
 
 def build_related_song_queries(seed: dict[str, Any]) -> list[str]:
