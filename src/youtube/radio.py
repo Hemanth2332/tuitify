@@ -3,7 +3,13 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from .utils import clean_tracks, normalize_title, parse_recommendations, track_signature
+from .utils import (
+    clean_tracks,
+    normalize_title,
+    parse_recommendations,
+    title_token_set,
+    track_signature,
+)
 from .service import YouTubeService
 
 class RadioEngine:
@@ -237,12 +243,21 @@ class RadioEngine:
             seed_artist = self._artist_key(seed)
             track_artist = self._artist_key(track)
             if seed_artist and track_artist == seed_artist:
-                score += 0.75
+                score += 0.35
 
             seed_album = self._album_key(seed)
             track_album = self._album_key(track)
             if seed_album and track_album and seed_album == track_album:
                 score += 0.5
+
+            seed_title_tokens = title_token_set(str(seed.get("title") or ""))
+            track_title_tokens = title_token_set(str(track.get("title") or ""))
+            if seed_title_tokens and track_title_tokens:
+                overlap = len(seed_title_tokens & track_title_tokens)
+                if overlap >= max(2, min(len(seed_title_tokens), len(track_title_tokens))):
+                    score -= 3.25
+                elif overlap:
+                    score -= overlap * 0.6
 
         recent_history = self.history[-self.title_cooldown :]
         recent_artists = {
@@ -265,11 +280,11 @@ class RadioEngine:
         track_album = self._album_key(track)
 
         if track_artist and track_artist in recent_artists:
-            score -= 2.75
+            score -= 4.25
         if track_title and track_title in recent_titles:
-            score -= 4.0
+            score -= 6.0
         if track_album and track_album in recent_albums:
-            score -= 1.25
+            score -= 2.25
 
         if upcoming:
             queued_artists = {
@@ -282,13 +297,14 @@ class RadioEngine:
                 for item in upcoming
             }
             if track_artist and track_artist in queued_artists:
-                score -= 1.75
+                score -= 3.0
             if track_title and track_title in queued_titles:
-                score -= 5.0
+                score -= 7.0
 
             if upcoming and track_artist:
                 last_planned_artist = self._artist_key(upcoming[-1])
                 if last_planned_artist == track_artist:
-                    score -= 1.5
+                    score -= 3.0
 
         return score
+

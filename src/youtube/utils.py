@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 
@@ -47,7 +48,11 @@ def normalize_title(title: str) -> str:
     for word in junk_words:
         normalized = normalized.replace(word, "")
 
-    normalized = re.sub(r"[^a-z0-9 ]", "", normalized)
+    normalized = "".join(
+        char
+        for char in normalized
+        if char.isspace() or _is_word_character(char)
+    )
     return " ".join(normalized.split())
 
 
@@ -56,7 +61,11 @@ def normalize_artist_name(name: str | None) -> str:
     normalized = re.sub(r"\s*-\s*topic$", "", normalized)
     normalized = re.sub(r"vevo$", "", normalized)
     normalized = re.sub(r"\s*official\s*$", "", normalized)
-    normalized = re.sub(r"[^a-z0-9 ]", "", normalized)
+    normalized = "".join(
+        char
+        for char in normalized
+        if char.isspace() or _is_word_character(char)
+    )
     return " ".join(normalized.split())
 
 
@@ -130,6 +139,7 @@ def parse_recommendations(data: dict[str, Any], limit: int = 30) -> list[dict[st
 
 def clean_tracks(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen_ids: set[str] = set()
+    seen_signatures: set[str] = set()
     seen_titles: set[str] = set()
     cleaned: list[dict[str, Any]] = []
 
@@ -140,16 +150,36 @@ def clean_tracks(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
 
         normalized = normalize_title(title)
-        if track_id in seen_ids or normalized in seen_titles:
+        signature = track_signature(track)
+        if (
+            track_id in seen_ids
+            or (normalized and normalized in seen_titles)
+            or (signature and signature in seen_signatures)
+        ):
             continue
         if not is_real_song(track):
             continue
 
         seen_ids.add(track_id)
-        seen_titles.add(normalized)
+        if normalized:
+            seen_titles.add(normalized)
+        if signature:
+            seen_signatures.add(signature)
         cleaned.append(track)
 
     return cleaned
+
+
+
+
+def title_token_set(title: str) -> set[str]:
+    normalized = normalize_title(title)
+    return {token for token in normalized.split() if token}
+
+
+def _is_word_character(char: str) -> bool:
+    category = unicodedata.category(char)
+    return category[0] in {"L", "N"}
 
 
 def build_related_song_queries(seed: dict[str, Any]) -> list[str]:
