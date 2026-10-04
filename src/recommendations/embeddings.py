@@ -14,10 +14,16 @@ class EmbeddingEncoder:
         self,
         dimension: int = 384,
         model_name: str = "all-MiniLM-L6-v2",
+        onnx_model: bool = False,
     ) -> None:
         self.dimension = dimension
         self.model_name = model_name
-        self._model = self._load_transformer_model()
+        self.onnx_model = onnx_model
+
+        if self.onnx_model:
+            self._model = self._load_onnx_model()
+        else:
+            self._model = self._load_transformer_model()
 
     def encode_track(self, track: dict[str, Any]) -> list[float]:
         return self.encode_text(self.build_track_text(track))
@@ -93,5 +99,18 @@ class EmbeddingEncoder:
 
         try:
             return SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _load_onnx_model() -> Any | None:
+        try:
+            from light_embed import TextEmbedding
+        except Exception:
+            return None
+
+        try:
+            model_path = "sentence-transformers/all-MiniLM-L6-v2"
+            return TextEmbedding(model_path)
         except Exception:
             return None
