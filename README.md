@@ -84,9 +84,24 @@ As a contributor to [SimpMusic](https://github.com/maxrave-dev/SimpMusic), I’v
 
 ### Running the App
 
-Simply run the `main.py` file:
+Run the `tuitify` command:
 ```bash
+uv run tuitify
+# or
 uv run ./main.py
+```
+
+### Data Location
+
+Tuitify stores its data in `~/.config/tuitify/` on every OS (`C:\Users\<you>\.config\tuitify` on Windows):
+
+- `recommendations.db`: listening history used for radio recommendations
+- `settings.json`: user settings such as the selected theme
+
+Upgrading from an older version that kept data in `./.tuitify/`? Copy the database over to keep your history:
+
+```bash
+mkdir -p ~/.config/tuitify && cp .tuitify/recommendations.db ~/.config/tuitify/
 ```
 
 ## Controls
@@ -100,7 +115,7 @@ uv run ./main.py
 - `q`: Quit Tuitify
 - `t`: cycle through themes
 
-Feel Free to change the keybindings to your own preference in `src/tui/keybindings.py`.
+Feel Free to change the keybindings to your own preference in `tuitify/tui/keybindings.py`.
 
 # Single binary file Support:
 Added support for binary file. You can download the binary from Releases
@@ -109,19 +124,19 @@ Use this command to create a single binary file from source.
 
 For Windows:
 ```bash
-uv run pyinstaller --onefile --add-data "src/tui/styles.tcss;src/tui" main.py
+uv run pyinstaller --onefile --add-data "tuitify/tui/styles.tcss;tuitify/tui" --add-data "tuitify/tui/settings.json;tuitify/tui" main.py
 ```
 
 For Linux and Mac:
 ```bash
-uv run pyinstaller --onefile --add-data=src/tui/styles.tcss:src/tui main.py
+uv run pyinstaller --onefile --add-data=tuitify/tui/styles.tcss:tuitify/tui --add-data=tuitify/tui/settings.json:tuitify/tui main.py
 ```
 
 ## Project Structure
 
-- `src/tui/`: Main TUI application logic and layout.
-- `src/youtube/`: YouTube service, streaming player, and recommendation engine.
-- `src/search/`: Search-specific wrappers.
+- `tuitify/tui/`: Main TUI application logic and layout.
+- `tuitify/youtube/`: YouTube service, streaming player, and recommendation engine.
+- `tuitify/search/`: Search-specific wrappers.
 
 
 ## Contribution

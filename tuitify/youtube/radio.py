@@ -4,7 +4,8 @@ import random
 from pathlib import Path
 from typing import Any
 
-from src.recommendations.recommender import PersonalizedRecommender
+from tuitify import paths
+from tuitify.recommendations.recommender import PersonalizedRecommender
 
 from .utils import (
     clean_tracks,
@@ -39,7 +40,7 @@ class RadioEngine:
         self.album_cooldown = album_cooldown
         self.history: list[dict[str, Any]] = []
         self.queue: list[dict[str, Any]] = []
-        database_path = Path(recommendation_db_path or Path.cwd() / ".tuitify" / "recommendations.db")
+        database_path = Path(recommendation_db_path) if recommendation_db_path else paths.database_path()
         self.recommender = PersonalizedRecommender(database_path=database_path)
 
     def mark_played(self, track: dict[str, Any]) -> None:

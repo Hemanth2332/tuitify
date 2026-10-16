@@ -16,10 +16,11 @@ from textual.widgets import Footer, Header, Input, ListView, ProgressBar, Select
 from textual_image.widget import Image
 from rich.text import Text
 
-from src.youtube.radio import RadioEngine
-from src.search.searcher import YoutubeSearcher
-from src.youtube.player import YTStreamVLC
-from src.youtube.utils import track_signature
+from tuitify import paths
+from tuitify.youtube.radio import RadioEngine
+from tuitify.search.searcher import YoutubeSearcher
+from tuitify.youtube.player import YTStreamVLC
+from tuitify.youtube.utils import track_signature
 
 from .keybindings import BINDINGS
 
@@ -27,8 +28,7 @@ class Tuitify(App):
 
     BINDINGS = BINDINGS
 
-    CSS_PATH = "styles.tcss"
-    THEME_SETTINGS_PATH = Path(__file__).with_name("settings.json")
+    CSS_PATH = Path(__file__).with_name("styles.tcss")
 
     def __init__(self) -> None:
         super().__init__()
@@ -643,10 +643,11 @@ class Tuitify(App):
         self._write_settings(settings)
 
     def _load_settings(self) -> dict[str, Any]:
-        path = self.THEME_SETTINGS_PATH
-        if not path.exists():
-            return {}
         try:
+            # settings_path() may create ~/.config/tuitify; fall back to defaults on failure.
+            path = paths.settings_path()
+            if not path.exists():
+                return {}
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return {}
@@ -655,7 +656,7 @@ class Tuitify(App):
         return {}
 
     def _write_settings(self, settings: dict[str, Any]) -> None:
-        path = self.THEME_SETTINGS_PATH
+        path = paths.settings_path()
         try:
             path.write_text(
                 json.dumps(settings, indent=2, ensure_ascii=True),

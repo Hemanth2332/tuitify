@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from src.youtube.utils import normalize_artist_name, title_token_set
+from tuitify.youtube.utils import normalize_artist_name, title_token_set
 
 from .embeddings import EmbeddingEncoder
 from .memory import RecommendationMemory

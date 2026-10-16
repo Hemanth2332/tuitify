@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.youtube.service import YouTubeService
+from tuitify.youtube.service import YouTubeService
 
 
 class YoutubeSearcher:
