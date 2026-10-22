@@ -5,6 +5,7 @@ description = "Terminal music player for YouTube"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "light-embed>=1.0.9",
     "python-vlc>=3.0.21203",
     "requests>=2.33.1",
     "sentence-transformers>=5.6.1",

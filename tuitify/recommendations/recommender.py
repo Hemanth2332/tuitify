@@ -21,7 +21,7 @@ class PersonalizedRecommender:
         memory: RecommendationMemory | None = None,
         scorer: RecommendationScorer | None = None,
     ) -> None:
-        self.encoder = encoder or EmbeddingEncoder()
+        self.encoder = encoder or EmbeddingEncoder(onnx_model=False)
         self.memory = memory or RecommendationMemory(database_path, encoder=self.encoder)
         self.scorer = scorer or RecommendationScorer()
 

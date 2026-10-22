@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import random
 from pathlib import Path
@@ -92,81 +92,12 @@ class RadioEngine:
         if not video_id:
             return []
 
-        related: list[dict[str, Any]] = []
-
-        for query in self._build_related_queries(seed):
-            try:
-                related.extend(
-                    self.service.search_songs(
-                        query=query,
-                        num_results=max(self.recommendation_limit // 2, 8),
-                    )
-                )
-            except Exception:
-                continue
-            if len(related) >= self.recommendation_limit * 2:
-                break
-
         try:
             data = self.service.fetch_recommendations(video_id)
         except Exception:
-            data = None
+            return []
 
-        if data is not None:
-            related.extend(
-                parse_recommendations(data, limit=self.recommendation_limit)
-            )
-
-        return related
-
-    def _build_related_queries(self, seed: dict[str, Any]) -> list[str]:
-        artist_name = " ".join(str(seed.get("artist_name") or "").split())
-        title = " ".join(str(seed.get("title") or "").split())
-        
-        recent_artists = [
-            self._artist_key(track)
-            for track in reversed(self.history[-5:])
-            if self._artist_key(track)
-        ]
-        session_artist = next(
-            (artist for artist in recent_artists if artist and artist != artist_name.lower()),
-            "",
-        )
-
-        queries = []
-        if artist_name:
-            queries.extend([
-                f"{artist_name} tracks",
-                f"{artist_name} radio",
-            ])
-            if session_artist:
-                queries.append(f"{artist_name} {session_artist}")
-        elif title:
-            queries.append(f"{title} similar songs")
-
-        tags = seed.get("tags") or []
-        useful_tags = [
-            t for t in tags
-            if len(t) > 3
-            and t.lower() not in ("music", "video", "audio", "official", "lyric", "lyrics", "cover", "song")
-            and artist_name.lower() not in t.lower()
-        ]
-        if useful_tags:
-            import random
-            selected = random.sample(useful_tags, min(2, len(useful_tags)))
-            for tag in selected:
-                queries.append(f"{tag} music")
-
-        seen: set[str] = set()
-        unique_queries: list[str] = []
-        for query in queries:
-            normalized_query = " ".join(query.lower().split())
-            if not normalized_query or normalized_query in seen:
-                continue
-            seen.add(normalized_query)
-            unique_queries.append(query)
-
-        return unique_queries
+        return parse_recommendations(data, limit=self.recommendation_limit)
 
     def build_queue(
         self, seed: dict[str, Any], limit: int = 10
@@ -338,3 +269,5 @@ class RadioEngine:
         if count < 2:
             return None
         return cluster
+
+
